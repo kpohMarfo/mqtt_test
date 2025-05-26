@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "171806729310",
+    "project_id": "kostmqtt",
+    "storage_bucket": "kostmqtt.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:171806729310:android:22865531db56e2469400cf",
+        "android_client_info": {
+          "package_name": "com.example.kaks_kost"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBh5OwqvbFRkreKoFU9DYB86Z7T64ZhWp0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
