@@ -1,20 +1,18 @@
 plugins {
-  // ...
+    // ...
 
-  // Add the dependency for the Google services Gradle plugin
-  id 'com.google.gms.google-services' version '4.4.2' apply false
-
+    // Add the dependency for the Google services Gradle plugin
+    id("com.google.gms.google-services") version "4.4.2" apply false
+    id("org.jetbrains.kotlin.android") version "2.1.10" apply false
 }
 
-dependencies {
-    // Import the BoM for the Firebase platform
-    implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
+// dependencies {
+//     // Import the BoM for the Firebase platform
+//     implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
 
-    // Add the dependency for the Firebase Authentication library
-    // When using the BoM, you don't specify versions in Firebase library dependencies
-    implementation("com.google.firebase:firebase-auth")
-}
-
+//     // // Add the dependency for the Firebase Authentication library
+//     // implementation("com.google.firebase:firebase-auth")
+// }
 
 allprojects {
     repositories {
