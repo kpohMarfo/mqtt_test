@@ -16,66 +16,73 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
- Future<String> _getInitialRoute() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return '/login';
-
-  try {
-    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    final data = doc.data();
-    final hasBinding = data != null && data['kamar_id'] != null;
-    return hasBinding ? '/dashboard' : '/binding';
-  } catch (e) {
-    print("🔥 Error saat membaca Firestore: $e");
-    return '/login';
-  }
-}
-
-
-  @override
-Widget build(BuildContext context) {
-   return FutureBuilder<String>(
-  future: _getInitialRoute(),
-  builder: (context, snapshot) {
-    print('📦 snapshot connectionState: ${snapshot.connectionState}');
-    print('📦 snapshot hasData: ${snapshot.hasData}');
-    print('📦 snapshot data: ${snapshot.data}');
-
-    if (snapshot.connectionState != ConnectionState.done) {
-      return const MaterialApp(
-        home: Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        ),
-      );
+  Future<String> _getInitialRoute() async {
+    print('DEBUG: _getInitialRoute dipanggil'); // Debug print
+    final user = FirebaseAuth.instance.currentUser;
+    print('DEBUG: user dari FirebaseAuth: $user'); // Debug print
+    if (user == null) {
+      print('DEBUG: User adalah null, mengembalikan /login'); // Debug print
+      return '/login';
     }
 
-    final initialRoute = snapshot.data ?? '/login';
-    print('📦 Initial route to use: $initialRoute');
+    print('DEBUG: User tidak null, UID: ${user.uid}'); // Debug print
 
-    return MaterialApp(
-      title: 'Kost Security App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      debugShowCheckedModeBanner: false,
-      initialRoute: initialRoute,
-      routes: {
-        '/login': (context) {
-          print('🔁 Navigating to LoginScreen');
-          return LoginScreen();
-        },
-        '/binding': (context) {
-          print('🔁 Navigating to BindingScreen');
-          return BindingScreen();
-        },
-        '/dashboard': (context) {
-          print('🔁 Navigating to DashboardPage');
-          return DashboardPage();
-        },
+    try {
+      print('DEBUG: Mencoba mendapatkan dokumen Firestore untuk user: ${user.uid}'); // Debug print
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      print('DEBUG: Dokumen Firestore berhasil diambil. Exists: ${doc.exists}'); // Debug print
+      final data = doc.data();
+      print('DEBUG: Data dokumen: $data'); // Debug print
+      final hasBinding = data != null && data['kamar_id'] != null;
+      print('DEBUG: hasBinding: $hasBinding'); // Debug print
+      return hasBinding ? '/dashboard' : '/binding';
+    } catch (e) {
+      print("🔥 Error saat membaca Firestore: $e"); // Debug print
+      return '/login';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: _getInitialRoute(),
+      builder: (context, snapshot) {
+        print('📦 snapshot connectionState: ${snapshot.connectionState}');
+        print('📦 snapshot hasData: ${snapshot.hasData}');
+        print('📦 snapshot data: ${snapshot.data}');
+
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const MaterialApp(
+            home: Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
+        final initialRoute = snapshot.data ?? '/login';
+        print('📦 Initial route to use: $initialRoute');
+
+        return MaterialApp(
+          title: 'Kost Security App',
+          theme: ThemeData.light(), // Tetap pakai tema sederhana
+          debugShowCheckedModeBanner: false,
+          initialRoute: initialRoute,
+          routes: {
+            '/login': (context) {
+              print('🔁 Navigating to LoginScreen');
+              return LoginScreen();
+            },
+            '/binding': (context) {
+              print('🔁 Navigating to BindingScreen');
+              return BindingScreen();
+            },
+            '/dashboard': (context) {
+              print('🔁 Navigating to DashboardPage');
+              return DashboardPage();
+            },
+          },
+        );
       },
     );
-  },
-);
-}
+  }
 }
