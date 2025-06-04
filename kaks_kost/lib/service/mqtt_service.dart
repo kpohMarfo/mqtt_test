@@ -1,96 +1,83 @@
 // lib/service/mqtt_service.dart
 
-// import 'dart:io';
 import 'dart:async';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
+import 'package:uuid/uuid.dart'; // Import uuid package
 
 class MQTTService {
-  // Singleton pattern
   static final MQTTService _instance = MQTTService._internal();
   factory MQTTService() => _instance;
   MQTTService._internal();
 
-  // Konfigurasi broker MQTT
   final String broker = 'c7fcebd6fd734d00acf71e1b3f69157a.s1.eu.hivemq.cloud';
   final int port = 8883;
   final String username = 'rafo26';
   final String password = 'R@fo12345';
-  final String clientIdentifier = 'flutter_kost_app';
+  // final String clientIdentifier = 'flutter_kost_app'; // Original
+  final String clientIdentifier = 'flutter_kost_app_${Uuid().v4()}'; // <<< Perubahan di sini: Client ID unik
   
-  // Mengubah 'late' menjadi nullable dan diinisialisasi dengan null.
-  // Ini lebih aman karena tidak ada jaminan 'client' akan diinisialisasi
-  // sebelum diakses di beberapa skenario, terutama dengan singleton.
   MqttServerClient? _client; 
 
-  // StreamControllers untuk status koneksi dan pesan masuk
   final _statusController = StreamController<String>.broadcast();
   final _messageController = StreamController<String>.broadcast();
 
-  // Getters untuk stream
   Stream<String> get statusStream => _statusController.stream;
   Stream<String> get messageStream => _messageController.stream;
 
-  /// Metode untuk menghubungkan ke broker MQTT
   Future<void> connect() async {
-    // Jika client sudah ada dan terhubung, tidak perlu koneksi ulang
     if (_client != null && _client!.connectionStatus?.state == MqttConnectionState.connected) {
-      print('✅ MQTT client sudah terhubung.');
+      print('✅ MQTT client sudah terhubung. (Dari connect())');
       _statusController.add('✅ Terhubung ke broker');
       return;
     }
 
-    // Inisialisasi client MQTT
     _client = MqttServerClient(broker, clientIdentifier);
     _client!.port = port;
-    _client!.secure = true; // Menggunakan koneksi aman (SSL/TLS)
-    _client!.logging(on: true); // Aktifkan logging
-    _client!.keepAlivePeriod = 20; // Periode keep-alive dalam detik
+    _client!.secure = true;
+    _client!.logging(on: true);
+    _client!.keepAlivePeriod = 20;
     
-    // Menetapkan callback untuk event koneksi
     _client!.onDisconnected = onDisconnected;
     _client!.onConnected = onConnected;
     _client!.onSubscribed = onSubscribed;
 
-    // Membuat pesan koneksi
     final connMess = MqttConnectMessage()
         .withClientIdentifier(clientIdentifier)
-        .startClean() // Mulai sesi baru setiap kali
+        .startClean()
         .keepAliveFor(20)
         .authenticateAs(username, password)
         .withWillQos(MqttQos.atLeastOnce);
 
     _client!.connectionMessage = connMess;
 
+    print('DEBUG MQTT: Memulai koneksi ke $broker:$port dengan Client ID: $clientIdentifier'); // DEBUG
     try {
-      // Mencoba terhubung ke broker
       await _client!.connect();
+      print('DEBUG MQTT: client.connect() selesai.'); // DEBUG
     } catch (e) {
-      print('❌ Gagal koneksi: $e');
-      _client?.disconnect(); // Gunakan null-aware operator
+      print('❌ Gagal koneksi (catch block): $e'); // DEBUG
+      _client?.disconnect();
       _statusController.add('❌ Koneksi gagal');
-      _client = null; // Set client menjadi null jika gagal
+      _client = null;
       return;
     }
 
-    // Memeriksa status koneksi setelah mencoba terhubung
     if (_client!.connectionStatus!.state == MqttConnectionState.connected) {
-      print('✅ Koneksi MQTT berhasil');
+      print('✅ Koneksi MQTT berhasil (status connected).'); // DEBUG
       _statusController.add('✅ Terhubung ke broker');
     } else {
-      print('❌ Gagal koneksi, status: ${_client!.connectionStatus}');
+      print('❌ Gagal koneksi (status tidak connected), status: ${_client!.connectionStatus}'); // DEBUG
       _statusController.add('❌ Status tidak terhubung');
-      _client?.disconnect(); // Gunakan null-aware operator
-      _client = null; // Set client menjadi null jika gagal
+      _client?.disconnect();
+      _client = null;
       return;
     }
 
-    // Subscribe ke topik notifikasi umum
     subscribe('kamar/+/notif');
 
-    // Listener untuk pesan masuk
     _client!.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
-      if (c == null || c.isEmpty) return; // Tambahkan null check untuk 'c'
+      if (c == null || c.isEmpty) return;
       final recMess = c[0].payload as MqttPublishMessage;
       final message =
           MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
@@ -98,9 +85,8 @@ class MQTTService {
 
       print('📥 Pesan dari $topic: $message');
 
-      _messageController.add(message); // Kirim pesan ke stream untuk UI
+      _messageController.add(message);
 
-      // Logika khusus untuk notifikasi
       if (topic.contains('notif')) {
         if (message == 'asap_terdeteksi') {
           print('🚨 Asap terdeteksi!');
@@ -111,9 +97,7 @@ class MQTTService {
     });
   }
 
-  /// Metode untuk subscribe ke topik MQTT
   void subscribe(String topic) {
-    // Pastikan client tidak null dan terhubung sebelum subscribe
     if (_client != null && _client!.connectionStatus?.state == MqttConnectionState.connected) {
       _client!.subscribe(topic, MqttQos.atMostOnce);
       print('📡 Subscribe ke topik: $topic');
@@ -122,13 +106,10 @@ class MQTTService {
     }
   }
 
-  /// Metode untuk publish pesan ke topik MQTT
   void publish(String topic, String message) {
-    // Pastikan client tidak null dan terhubung sebelum publish
     if (_client != null && _client!.connectionStatus?.state == MqttConnectionState.connected) {
       final builder = MqttClientPayloadBuilder();
       builder.addString(message);
-      // builder.payload! aman di sini karena builder.addString pasti mengembalikan payload
       _client!.publishMessage(topic, MqttQos.atMostOnce, builder.payload!); 
       print('📤 Publish ke $topic: $message');
     } else {
@@ -136,30 +117,26 @@ class MQTTService {
     }
   }
 
-  /// Callback saat koneksi terputus
   void onDisconnected() {
-    print('🔌 Terputus dari broker');
+    print('🔌 Terputus dari broker (callback)'); // DEBUG
     _statusController.add('🔌 Terputus');
-    _client = null; // Set client menjadi null saat terputus
+    _client = null;
   }
 
-  /// Callback saat koneksi berhasil
   void onConnected() {
-    print('🔗 Terhubung ke broker');
+    print('🔗 Terhubung ke broker (callback)'); // DEBUG
     _statusController.add('🔗 Terhubung');
   }
 
-  /// Callback saat berhasil subscribe
   void onSubscribed(String topic) {
-    print('📶 Berhasil subscribe ke $topic');
+    print('📶 Berhasil subscribe ke $topic (callback)'); // DEBUG
   }
 
-  /// Metode untuk memutuskan koneksi secara manual
   void disconnect() {
     if (_client != null) {
       _client!.disconnect();
       _statusController.add('🔌 Manual disconnect');
-      _client = null; // Set client menjadi null saat disconnect manual
+      _client = null;
     }
   }
 }

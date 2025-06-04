@@ -17,27 +17,27 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   Future<String> _getInitialRoute() async {
-    print('DEBUG: _getInitialRoute dipanggil'); // Debug print
+    print('DEBUG: _getInitialRoute dipanggil');
     final user = FirebaseAuth.instance.currentUser;
-    print('DEBUG: user dari FirebaseAuth: $user'); // Debug print
+    print('DEBUG: user dari FirebaseAuth: $user');
     if (user == null) {
-      print('DEBUG: User adalah null, mengembalikan /login'); // Debug print
+      print('DEBUG: User adalah null, mengembalikan /login');
       return '/login';
     }
 
-    print('DEBUG: User tidak null, UID: ${user.uid}'); // Debug print
+    print('DEBUG: User tidak null, UID: ${user.uid}');
 
     try {
-      print('DEBUG: Mencoba mendapatkan dokumen Firestore untuk user: ${user.uid}'); // Debug print
+      print('DEBUG: Mencoba mendapatkan dokumen Firestore untuk user: ${user.uid}');
       final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      print('DEBUG: Dokumen Firestore berhasil diambil. Exists: ${doc.exists}'); // Debug print
+      print('DEBUG: Dokumen Firestore berhasil diambil. Exists: ${doc.exists}');
       final data = doc.data();
-      print('DEBUG: Data dokumen: $data'); // Debug print
+      print('DEBUG: Data dokumen: $data');
       final hasBinding = data != null && data['kamar_id'] != null;
-      print('DEBUG: hasBinding: $hasBinding'); // Debug print
+      print('DEBUG: hasBinding: $hasBinding');
       return hasBinding ? '/dashboard' : '/binding';
     } catch (e) {
-      print("🔥 Error saat membaca Firestore: $e"); // Debug print
+      print("🔥 Error saat membaca Firestore: $e");
       return '/login';
     }
   }
@@ -62,26 +62,63 @@ class MyApp extends StatelessWidget {
         final initialRoute = snapshot.data ?? '/login';
         print('📦 Initial route to use: $initialRoute');
 
-        return MaterialApp(
-          title: 'Kost Security App',
-          theme: ThemeData.light(), // Tetap pakai tema sederhana
-          debugShowCheckedModeBanner: false,
-          initialRoute: initialRoute,
-          routes: {
-            '/login': (context) {
-              print('🔁 Navigating to LoginScreen');
-              return LoginScreen();
+        // Perubahan utama di sini:
+        // Jika initialRoute adalah '/login', kita langsung set home ke LoginScreen.
+        // Jika tidak, kita gunakan Navigator.pushReplacementNamed setelah MaterialApp dibangun.
+        if (initialRoute == '/login') {
+          return MaterialApp(
+            title: 'Kost Security App',
+            theme: ThemeData.light(),
+            debugShowCheckedModeBanner: false,
+            home: LoginScreen(), // Langsung set home ke LoginScreen
+            routes: {
+              // Routes lain tetap ada, tapi '/login' tidak perlu di sini
+              // karena sudah ditangani oleh 'home'
+              '/binding': (context) {
+                print('🔁 Navigating to BindingScreen');
+                return BindingScreen();
+              },
+              '/dashboard': (context) {
+                print('🔁 Navigating to DashboardPage');
+                return DashboardPage();
+              },
             },
-            '/binding': (context) {
-              print('🔁 Navigating to BindingScreen');
-              return BindingScreen();
+          );
+        } else {
+          // Untuk rute selain '/login', kita perlu Navigator untuk pindah
+          return MaterialApp(
+            title: 'Kost Security App',
+            theme: ThemeData.light(),
+            debugShowCheckedModeBanner: false,
+            // initialRoute tidak digunakan di sini karena kita akan pushReplacement
+            home: Builder( // Gunakan Builder untuk mendapatkan BuildContext yang valid
+              builder: (BuildContext innerContext) {
+                // Pastikan pushReplacementNamed dipanggil setelah frame pertama dibangun
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  Navigator.pushReplacementNamed(innerContext, initialRoute);
+                });
+                // Tampilkan CircularProgressIndicator sementara navigasi terjadi
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              },
+            ),
+            routes: {
+              '/login': (context) {
+                print('🔁 Navigating to LoginScreen');
+                return LoginScreen();
+              },
+              '/binding': (context) {
+                print('🔁 Navigating to BindingScreen');
+                return BindingScreen();
+              },
+              '/dashboard': (context) {
+                print('🔁 Navigating to DashboardPage');
+                return DashboardPage();
+              },
             },
-            '/dashboard': (context) {
-              print('🔁 Navigating to DashboardPage');
-              return DashboardPage();
-            },
-          },
-        );
+          );
+        }
       },
     );
   }

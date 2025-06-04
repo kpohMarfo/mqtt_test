@@ -37,6 +37,7 @@ dependencies:
   firebase_core: ^3.13.1
   firebase_auth: ^5.5.4
   cloud_firestore: ^5.6.8
+  uuid: ^4.4.0
   mqtt_client: ^10.8.1
 
 dev_dependencies:

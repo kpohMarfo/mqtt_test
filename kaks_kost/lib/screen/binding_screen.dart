@@ -15,40 +15,45 @@ class _BindingScreenState extends State<BindingScreen> {
   bool loading = false;
 
   Future<void> handleBinding() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    print("❌ Tidak ada user yang login");
-    return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print("❌ Tidak ada user yang login");
+      // Mungkin arahkan kembali ke login jika tidak ada user
+      if (mounted) Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
+
+    final deviceId = deviceIdController.text.trim();
+    print("🔗 Mulai binding ke device ID: '$deviceId'"); // DEBUG: Periksa nilai deviceId
+
+    if (deviceId.isEmpty) {
+      setState(() => errorMessage = 'Device ID tidak boleh kosong.');
+      print("⚠️ Device ID kosong, binding dibatalkan."); // DEBUG: Log jika kosong
+      return; // Sangat penting: keluar dari fungsi jika kosong
+    }
+
+    setState(() {
+      loading = true;
+      errorMessage = '';
+    });
+
+    try {
+      await FirestoreService().bindUserKeKamar(deviceId);
+      print("✅ Binding sukses ke $deviceId");
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      }
+    } catch (e) {
+      print("❌ Gagal binding: $e");
+      setState(() => errorMessage = 'Gagal menghubungkan perangkat. Error: ${e.toString()}'); // Tampilkan error lebih detail
+    } finally {
+      setState(() => loading = false);
+    }
   }
-
-  final deviceId = deviceIdController.text.trim();
-  print("🔗 Mulai binding ke device ID: $deviceId");
-
-  if (deviceId.isEmpty) {
-    setState(() => errorMessage = 'Device ID tidak boleh kosong.');
-    return;
-  }
-
-  setState(() {
-    loading = true;
-    errorMessage = '';
-  });
-
-  try {
-    await FirestoreService().bindUserKeKamar(deviceId);
-    print("✅ Binding sukses ke $deviceId");
-    Navigator.pushReplacementNamed(context, '/dashboard');
-  } catch (e) {
-    print("❌ Gagal binding: $e");
-    setState(() => errorMessage = 'Gagal menghubungkan perangkat.');
-  } finally {
-    setState(() => loading = false);
-  }
-}
 
   @override
   Widget build(BuildContext context) {
-      print('📍 LoginScreen dibangun');
+    print('📍 BindingScreen dibangun'); // Perbaiki log ini
     return Scaffold(
       appBar: AppBar(title: Text('Hubungkan Kamar')),
       body: Padding(
@@ -60,6 +65,7 @@ class _BindingScreenState extends State<BindingScreen> {
               controller: deviceIdController,
               decoration: InputDecoration(
                 labelText: 'Masukkan ID Kamar / Device',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)), // Tambahkan border agar lebih jelas
               ),
             ),
             SizedBox(height: 20),
