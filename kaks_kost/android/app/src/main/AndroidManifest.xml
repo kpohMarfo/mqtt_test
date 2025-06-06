@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.kaks_kost"> <!-- Pastikan package name Anda benar di sini, tambahkan jika hilang -->
+    package="com.example.kaks_kost">
 
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
@@ -8,7 +8,7 @@
         android:label="kaks_kost"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:networkSecurityConfig="@xml/network_security_config"> <!-- <<< Perubahan di sini -->
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -36,6 +36,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- META-DATA BARU UNTUK FLUTTER LOCAL NOTIFICATIONS -->
+        <meta-data
+            android:name="com.dexterous.flutterlocalnotifications.MainActivityLaunchMode"
+            android:value="singleInstance" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

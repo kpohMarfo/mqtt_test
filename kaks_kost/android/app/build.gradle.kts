@@ -10,6 +10,8 @@ plugins {
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
     implementation("com.google.firebase:firebase-auth")
+    // Add this dependency for core library desugaring using Kotlin DSL syntax
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4") // <<< FIXED SYNTAX FOR KOTLIN DSL
 }
 
 android {
@@ -20,6 +22,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // Enable desugaring for Java 8 language features
+        isCoreLibraryDesugaringEnabled = true // <<< FIXED SYNTAX FOR KOTLIN DSL
     }
 
     kotlinOptions {
@@ -31,7 +35,7 @@ android {
         applicationId = "com.example.kaks_kost"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23
+        minSdk = 23 // minSdkVersion must be 21 or higher for desugaring
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
