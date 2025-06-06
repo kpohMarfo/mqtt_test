@@ -1,5 +1,3 @@
-// lib/service/mqtt_service.dart
-
 import 'dart:async';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
@@ -10,12 +8,11 @@ class MQTTService {
   factory MQTTService() => _instance;
   MQTTService._internal();
 
-  // Konfigurasi broker MQTT (SESUAI DENGAN KODE ESP32 ANDA UNTUK MQ2 TEST)
-  final String broker =
-      'f1e0e15e.ala.asia-southeast1.emqxsl.com'; // Host EMQX Cloud Anda
-  final int port = 8883; // Port SSL/TLS Anda
-  final String username = 'rafo'; // <<< Username yang diperbarui
-  final String password = 'rafo12345678'; // <<< Password yang diperbarui
+  // Konfigurasi broker MQTT (SESUAI DENGAN EMQX CLOUD ANDA)
+  final String broker = 'f1e0e15e.ala.asia-southeast1.emqxsl.com';
+  final int port = 8883;
+  final String username = 'rafo'; // Kredensial untuk aplikasi Flutter
+  final String password = 'rafo12345678'; // Kredensial untuk aplikasi Flutter
 
   final String clientIdentifier = 'flutter_kost_app_${Uuid().v4()}';
 
@@ -28,7 +25,6 @@ class MQTTService {
   Stream<Map<String, String>> get messageStream => _messageController.stream;
 
   Future<void> connect(String kamarId) async {
-    // kamarId masih diteruskan untuk konsistensi
     if (_client != null &&
         _client!.connectionStatus?.state == MqttConnectionState.connected) {
       print('✅ MQTT client sudah terhubung. (Dari connect())');
@@ -38,7 +34,7 @@ class MQTTService {
 
     _client = MqttServerClient(broker, clientIdentifier);
     _client!.port = port;
-    _client!.secure = true; // Tetap true karena EMQX Cloud pakai SSL/TLS
+    _client!.secure = true; // Koneksi aman (SSL/TLS)
     _client!.logging(on: true);
     _client!.keepAlivePeriod = 20;
     _client!.onDisconnected = onDisconnected;
@@ -79,11 +75,19 @@ class MQTTService {
       return;
     }
 
-    // Subscribe hanya ke topik MQ2 untuk pengujian ini
-    subscribe("esp32/mq2"); // <<< Subscribe ke topik MQ2
-    // subscribe('kamar/+/notif'); // Komentari untuk fokus pada MQ2
-    // subscribe(kamarId + "/telemetry/temperature"); // Komentari untuk fokus pada MQ2
-    // subscribe(kamarId + "/telemetry/humidity");    // Komentari untuk fokus pada MQ2
+    // Subscribe ke semua topik yang relevan untuk debugging circuit (MQ2, PIR, Lampu)
+    subscribe('kamar/+/notif'); // Notifikasi (termasuk PIR) dari semua kamar
+    subscribe('esp32/mq2'); // Data MQ2 dari ESP32 (global)
+
+    // Subscribe ke topik kontrol/status spesifik kamar ini
+    subscribe('$kamarId/lampu'); // Untuk kontrol lampu
+    subscribe('$kamarId/status/#'); // Untuk status balasan lampu
+
+    // Topik-topik lain dikomentari untuk fokus pada debugging ini
+    // subscribe('kamar/+/telemetry/temperature');
+    // subscribe('kamar/+/telemetry/humidity');
+    // subscribe('$kamarId/pintu');
+    // subscribe('$kamarId/system');
 
     _client!.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
       if (c == null || c.isEmpty) return;
@@ -95,8 +99,6 @@ class MQTTService {
       print('📥 Pesan dari $topic: $message');
 
       _messageController.add({'topic': topic, 'message': message});
-
-      // Untuk pengujian ini, logika notifikasi/suhu/kelembaban lain akan dihandle di DashboardPage
     });
   }
 
