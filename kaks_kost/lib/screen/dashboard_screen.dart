@@ -19,19 +19,15 @@ class _DashboardPageState extends State<DashboardPage> {
   final mqttService = MQTTService();
   String? kamarId;
   String mqttStatus = 'Menghubungkan...';
-  String lastNotif = '-';
+  // String lastNotif = '-'; // <<< Dihilangkan dari UI
 
   int? mq2Value;
-  bool mq2AlertSent = false;
+  bool mq2AlertSent = false; // Untuk nilai MQ2 (>= 3000)
 
-  // Variabel untuk suhu/kelembaban dikomentari
-  // double? temperature;
-  // double? humidity;
+  bool pirAlertSent = false; // Untuk deteksi gerakan PIR
+  bool gasAlertSent = false; // Untuk deteksi asap dari notif (kamar/+/notif)
 
-  bool isLampuOn = false; // <<< Diaktifkan kembali
-  // bool isPintuTerkunci = true; // Kontrol pintu dinonaktifkan
-  bool pirAlertSent = false;
-  bool gasAlertSent = false;
+  bool isLampuOn = false;
 
   @override
   void initState() {
@@ -42,15 +38,16 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _showLocalNotification(String title, String body) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-      'alert_channel',
-      'Peringatan Keamanan Kost',
-      channelDescription: 'Notifikasi penting dari sistem keamanan kost',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: false,
+          'alert_channel',
+          'Peringatan Keamanan Kost',
+          channelDescription: 'Notifikasi penting dari sistem keamanan kost',
+          importance: Importance.max,
+          priority: Priority.high,
+          showWhen: false,
+        );
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
     );
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
     await flutterLocalNotificationsPlugin.show(
       0,
       title,
@@ -85,14 +82,16 @@ class _DashboardPageState extends State<DashboardPage> {
           final message = data['message'] ?? '';
 
           print(
-              'DEBUG Dashboard: Pesan Diterima - Topik: $topic, Pesan: $message');
+            'DEBUG Dashboard: Pesan Diterima - Topik: $topic, Pesan: $message',
+          );
           print('DEBUG Dashboard: Kamar ID Pengguna Saat Ini: $kamarId');
 
           // --- Client-Side Filtering & Authorization ---
-          bool isTopicRelevant = topic.startsWith('$kamarId/') ||
+          bool isTopicRelevant =
+              topic.startsWith('$kamarId/') ||
               topic.startsWith('kamar/$kamarId/') ||
               topic == 'esp32/mq2' ||
-              topic == '$kamarId/status/lampu'; // <<< Topik lampu relevan
+              topic == '$kamarId/status/lampu';
 
           if (isTopicRelevant) {
             print('DEBUG Dashboard: Topik relevan untuk kamar ini.');
@@ -105,24 +104,19 @@ class _DashboardPageState extends State<DashboardPage> {
 
                   if (mq2Value! >= 3000) {
                     if (!mq2AlertSent) {
-                      lastNotif =
-                          '🚨 Peringatan! Gas Terdeteksi (${mq2Value})!';
                       mq2AlertSent = true;
-                      _showLocalNotification('Peringatan Gas!',
-                          'Deteksi gas berbahaya. Nilai MQ2: ${mq2Value}.');
+                      _showLocalNotification(
+                        '🚨 Peringatan Gas!',
+                        'Deteksi gas berbahaya. Nilai MQ2: ${mq2Value}.',
+                      );
                     }
                   } else {
-                    if (mq2AlertSent) {
-                      lastNotif = '✅ Area aman dari gas.';
-                      mq2AlertSent = false;
-                    } else if (lastNotif == '-') {
-                      lastNotif = 'Tidak ada notifikasi baru.';
-                    }
+                    mq2AlertSent = false;
                   }
                 } catch (e) {
                   print("Error parsing MQ2 value: $e");
                   mq2Value = null;
-                  lastNotif = 'Error membaca nilai gas.';
+                  mq2AlertSent = false;
                 }
               });
             }
@@ -130,70 +124,58 @@ class _DashboardPageState extends State<DashboardPage> {
             else if (topic == 'kamar/$kamarId/notif') {
               setState(() {
                 if (message == 'asap_terdeteksi') {
-                  lastNotif = '🚨 Asap terdeteksi!';
                   if (!gasAlertSent) {
                     _showLocalNotification(
-                        'Peringatan Asap!', 'Asap terdeteksi di kamar Anda!');
+                      '🚨 Peringatan Asap!',
+                      'Asap terdeteksi di kamar Anda!',
+                    );
                     gasAlertSent = true;
                   }
                 } else if (message.contains('gerakan_terdeteksi')) {
-                  lastNotif = '🔔 Gerakan terdeteksi!';
                   if (!pirAlertSent) {
-                    _showLocalNotification('Peringatan Gerakan!',
-                        'Gerakan terdeteksi di kamar Anda!');
+                    _showLocalNotification(
+                      '🔔 Peringatan Gerakan!',
+                      'Gerakan terdeteksi di kamar Anda!',
+                    );
                     pirAlertSent = true;
                   }
                 } else {
                   if (message == "asap_aman") {
                     gasAlertSent = false;
-                    lastNotif = '✅ Area aman dari asap.';
                   }
                   if (message == "gerakan_aman") {
                     pirAlertSent = false;
-                    lastNotif = '✅ Area aman dari gerakan.';
                   }
                 }
               });
             }
             // Handle status lampu
             else if (topic == '$kamarId/status/lampu') {
-              // <<< Logika status lampu
               setState(() {
-                isLampuOn =
-                    (message == 'on'); // Update state lampu berdasarkan pesan
+                isLampuOn = (message == 'on');
               });
             }
-            // Topik lain yang tidak digunakan di setup debugging ini dikomentari
-            // else if (topic == '$kamarId/telemetry/temperature') { /* ... */ }
-            // else if (topic == '$kamarId/telemetry/humidity') { /* ... */ }
-            // else if (topic == '$kamarId/status/pintu') { /* ... */ }
           } else {
             print(
-                'DEBUG Dashboard: Pesan dari kamar lain atau topik tidak relevan: $topic. Kamar ID pengguna: $kamarId');
+              'DEBUG Dashboard: Pesan dari kamar lain atau topik tidak relevan: $topic. Kamar ID pengguna: $kamarId',
+            );
           }
         }
       });
     } else {
       if (mounted) {
-        setState(() {
-          mqttStatus = '❌ Belum bind ke kamar.';
-        });
+        setState(() => mqttStatus = '❌ Belum bind ke kamar.');
         Navigator.pushReplacementNamed(context, '/binding');
       }
     }
   }
 
   void kontrolLampu() {
-    // <<< Fungsi kontrol lampu
     if (kamarId == null) return;
-    final topic = '$kamarId/lampu'; // Topik kontrol lampu
+    final topic = '$kamarId/lampu';
     final command = isLampuOn ? 'off' : 'on';
-    mqttService.publish(topic, command); // Kirim perintah ke ESP32
-    // setState(() => isLampuOn = !isLampuOn); // Update UI segera setelah kirim perintah (opsional, bisa tunggu balasan status dari ESP32)
+    mqttService.publish(topic, command);
   }
-
-  // Fungsi kontrol pintu dikomentari untuk setup debugging ini
-  // void kontrolPintu() { /* ... */ }
 
   void logout() async {
     await FirebaseAuth.instance.signOut();
@@ -211,54 +193,240 @@ class _DashboardPageState extends State<DashboardPage> {
           IconButton(onPressed: logout, icon: const Icon(Icons.logout)),
         ],
       ),
-      body: kamarId == null
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Status MQTT: $mqttStatus'),
-                  const SizedBox(height: 10),
-                  Text('Notifikasi: $lastNotif',
+      body:
+          kamarId == null
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- Informasi Status (Tetap) ---
+                    Text(
+                      'Status MQTT: $mqttStatus',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // --- Header "A total of X devices" (Contoh) ---
+                    Text(
+                      'A total of 3 devices',
                       style: TextStyle(
-                          fontSize: 16,
-                          color: (mq2AlertSent || pirAlertSent || gasAlertSent)
-                              ? Colors.red
-                              : Colors.black)),
-                  const Divider(),
-                  Text('Nilai Gas MQ2: ${mq2Value?.toString() ?? '-'}',
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
-                  // Display suhu/kelembaban dikomentari
-                  // Text('Suhu: ${temperature?.toStringAsFixed(1) ?? '-'} °C', style: const TextStyle(fontSize: 16)),
-                  // Text('Kelembaban: ${humidity?.toStringAsFixed(1) ?? '-'} %', style: const TextStyle(fontSize: 16)),
-                  const Divider(),
-                  const Text('Kontrol Perangkat:',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  Row(
-                    // <<< Baris kontrol lampu diaktifkan
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: null, // Kontrol pintu dinonaktifkan
-                          child: const Text('Kontrol Pintu (Nonaktif)'),
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Kamar C8', // Atau nama kamar yang relevan
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueGrey[900],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // --- KARTU SENSOR BERSEBELAHAN (PIR Kiri Merah, MQ2 Kanan Biru/Ungu) ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // --- KARTU STATUS SENSOR PIR (Kiri, Merah) ---
+                        Expanded(
+                          child: Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 6.0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20.0),
+                            ),
+                            elevation: 8,
+                            // Warna kartu PIR: merah jika alert, default merah
+                            color:
+                                pirAlertSent
+                                    ? Colors.red.shade600
+                                    : Colors.red.shade400,
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Align(
+                                    alignment: Alignment.topRight,
+                                    child: Icon(
+                                      pirAlertSent
+                                          ? Icons.warning_rounded
+                                          : Icons.person_search_rounded,
+                                      size: 40,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 15),
+                                  Text(
+                                    'Deteksi Gerakan',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    pirAlertSent ? 'Terdeteksi!' : 'Aman',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // --- KARTU NILAI SENSOR MQ2 (Kanan, Biru/Ungu) ---
+                        Expanded(
+                          child: Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 6.0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20.0),
+                            ),
+                            elevation: 8,
+                            // Warna kartu MQ2: merah jika mq2AlertSent, default biru/ungu
+                            color:
+                                mq2AlertSent
+                                    ? Colors.red.shade600
+                                    : Colors
+                                        .deepPurple
+                                        .shade400, // <<< Perbaikan di sini
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Align(
+                                    alignment: Alignment.topRight,
+                                    child: Icon(
+                                      mq2AlertSent
+                                          ? Icons.warning_rounded
+                                          : Icons
+                                              .gas_meter_rounded, // <<< Perbaikan di sini
+                                      size: 40,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 15),
+                                  Text(
+                                    'Nilai Gas MQ2',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${mq2Value?.toString() ?? '-'}',
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Text(
+                                    'ADC Value',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // --- AKHIR KARTU SENSOR BERSEBELAHAN ---
+
+                    // --- KARTU KONTROL LAMPU (Gaya Mirip) ---
+                    Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 6.0,
+                        vertical: 8.0,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20.0),
+                      ),
+                      elevation: 8,
+                      color:
+                          isLampuOn
+                              ? Colors.deepOrange.shade400
+                              : Colors.blueGrey.shade400,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  isLampuOn
+                                      ? Icons.lightbulb_rounded
+                                      : Icons.lightbulb_outline_rounded,
+                                  size: 40,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Lampu Pintar',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 15),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Switch(
+                                value: isLampuOn,
+                                onChanged: (bool value) {
+                                  kontrolLampu();
+                                },
+                                activeColor: Colors.white,
+                                inactiveThumbColor: Colors.grey.shade300,
+                                inactiveTrackColor: Colors.white54,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              isLampuOn ? 'Menyala' : 'Mati',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: kontrolLampu, // <<< Diaktifkan
-                          child: Text(
-                              isLampuOn ? 'Matikan Lampu' : 'Nyalakan Lampu'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                    // --- AKHIR KARTU KONTROL LAMPU ---
+
+                    // --- KONTROL PERANGKAT LAIN (Nonaktif) ---
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Fitur kontrol lain akan ditambahkan di sini.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
               ),
-            ),
     );
   }
 }
