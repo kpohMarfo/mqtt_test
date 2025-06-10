@@ -18,18 +18,25 @@ class _BindingScreenState extends State<BindingScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       print("❌ Tidak ada user yang login");
-      // Mungkin arahkan kembali ke login jika tidak ada user
-      if (mounted) Navigator.pushReplacementNamed(context, '/login');
+      if (mounted) {
+         Navigator.pushReplacementNamed(context, '/login');
+      }
       return;
     }
 
-    final deviceId = deviceIdController.text.trim();
-    print("🔗 Mulai binding ke device ID: '$deviceId'"); // DEBUG: Periksa nilai deviceId
+    // Pembersihan dan validasi input yang lebih kuat
+    String deviceId = deviceIdController.text.trim();
+    // Hapus spasi berlebih dan karakter non-alphanumeric yang tidak diizinkan di awal/akhir
+    // Kecuali underscore atau hyphen jika Anda mengizinkannya
+    deviceId = deviceId.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]+'), ''); // Contoh: hanya izinkan huruf, angka, underscore, hyphen
+    // deviceId = deviceId.toLowerCase(); // Opsional: paksa menjadi huruf kecil untuk konsistensi
+
+    print("🔗 Mulai binding ke device ID (setelah pembersihan): '$deviceId'"); // DEBUG: Periksa nilai deviceId setelah dibersihkan
 
     if (deviceId.isEmpty) {
-      setState(() => errorMessage = 'Device ID tidak boleh kosong.');
-      print("⚠️ Device ID kosong, binding dibatalkan."); // DEBUG: Log jika kosong
-      return; // Sangat penting: keluar dari fungsi jika kosong
+      setState(() => errorMessage = 'ID Kamar tidak boleh kosong atau mengandung karakter yang tidak valid.');
+      print("⚠️ Device ID kosong atau tidak valid setelah pembersihan, binding dibatalkan.");
+      return;
     }
 
     setState(() {
@@ -45,7 +52,7 @@ class _BindingScreenState extends State<BindingScreen> {
       }
     } catch (e) {
       print("❌ Gagal binding: $e");
-      setState(() => errorMessage = 'Gagal menghubungkan perangkat. Error: ${e.toString()}'); // Tampilkan error lebih detail
+      setState(() => errorMessage = 'Gagal menghubungkan perangkat. Error: ${e.toString()}');
     } finally {
       setState(() => loading = false);
     }
@@ -53,7 +60,7 @@ class _BindingScreenState extends State<BindingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('📍 BindingScreen dibangun'); // Perbaiki log ini
+    print('📍 BindingScreen dibangun');
     return Scaffold(
       appBar: AppBar(title: Text('Hubungkan Kamar')),
       body: Padding(
@@ -65,7 +72,8 @@ class _BindingScreenState extends State<BindingScreen> {
               controller: deviceIdController,
               decoration: InputDecoration(
                 labelText: 'Masukkan ID Kamar / Device',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)), // Tambahkan border agar lebih jelas
+                hintText: 'Contoh: kamar1, ruang_A', // Tambahkan hint
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
               ),
             ),
             SizedBox(height: 20),

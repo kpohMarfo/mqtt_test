@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:kaks_kost/service/firestore_service.dart';
-import 'package:kaks_kost/service/mqtt_service.dart';
+import 'package:kaks_kost/service/mqtt_service.dart'; 
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({Key? key}) : super(key: key);
@@ -18,39 +18,89 @@ class _DashboardPageState extends State<DashboardPage> {
   bool isLampuOn = false;
   bool isPintuTerkunci = true;
 
+  double? temperature;
+  double? humidity;
+
   @override
   void initState() {
     super.initState();
-    setupMQTT();
+    _fetchKamarIdAndSetupMQTT(); 
   }
 
-  Future<void> setupMQTT() async {
+  Future<void> _fetchKamarIdAndSetupMQTT() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      if (mounted) Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
 
     kamarId = await FirestoreService().getKamarUser(user.uid);
 
     if (kamarId != null) {
-      mqttService.connect();
+      // Meneruskan kamarId ke mqttService.connect()
+      mqttService.connect(kamarId!); // <<< Perbaikan di sini
       mqttService.statusStream.listen((status) {
-        setState(() => mqttStatus = status);
+        if (mounted) {
+          setState(() => mqttStatus = status);
+        }
       });
 
-      mqttService.messageStream.listen((message) {
-        setState(() {
-          if (message == 'asap_terdeteksi') {
-            lastNotif = '🚨 Asap terdeteksi!';
-          } else if (message == 'gerakan_terdeteksi') {
-            lastNotif = '🔔 Gerakan terdeteksi!';
-          } else {
-            lastNotif = message;
+      mqttService.messageStream.listen((data) {
+        if (mounted) {
+          final topic = data['topic'] ?? '';
+          final message = data['message'] ?? '';
+
+          // Penanganan notifikasi sensor (asap, gerakan)
+          if (topic.contains('/notif')) {
+            setState(() {
+              if (message == 'asap_terdeteksi') {
+                lastNotif = '🚨 Asap terdeteksi!';
+              } else if (message.contains('gerakan_terdeteksi')) { 
+                lastNotif = '🔔 Gerakan terdeteksi!';
+              } else {
+                lastNotif = message;
+              }
+            });
+          } 
+          // Penanganan data telemetri (suhu, kelembaban)
+          else if (topic == '$kamarId/telemetry/temperature') {
+            setState(() {
+              try {
+                temperature = double.parse(message);
+              } catch (e) {
+                print("Error parsing temperature: $e");
+                temperature = null;
+              }
+            });
+          } else if (topic == '$kamarId/telemetry/humidity') {
+            setState(() {
+              try {
+                humidity = double.parse(message);
+              } catch (e) {
+                print("Error parsing humidity: $e");
+                humidity = null;
+              }
+            });
           }
-        });
+          // Penanganan status lampu/pintu (opsional, jika Anda ingin UI update otomatis)
+          else if (topic == '$kamarId/status/lampu') {
+            setState(() {
+              isLampuOn = (message == 'on');
+            });
+          } else if (topic == '$kamarId/status/pintu') {
+            setState(() {
+              isPintuTerkunci = (message == 'locked');
+            });
+          }
+        }
       });
     } else {
-      setState(() {
-        mqttStatus = '❌ Belum bind ke kamar.';
-      });
+      if (mounted) {
+        setState(() {
+          mqttStatus = '❌ Belum bind ke kamar.';
+        });
+        Navigator.pushReplacementNamed(context, '/binding');
+      }
     }
   }
 
@@ -59,7 +109,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final topic = '$kamarId/lampu';
     final command = isLampuOn ? 'off' : 'on';
     mqttService.publish(topic, command);
-    setState(() => isLampuOn = !isLampuOn);
+    setState(() => isLampuOn = !isLampuOn); 
   }
 
   void kontrolPintu() {
@@ -67,7 +117,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final topic = '$kamarId/pintu';
     final command = isPintuTerkunci ? 'unlock' : 'lock';
     mqttService.publish(topic, command);
-    setState(() => isPintuTerkunci = !isPintuTerkunci);
+    setState(() => isPintuTerkunci = !isPintuTerkunci); 
   }
 
   void logout() async {
@@ -78,7 +128,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-      print('📍 LoginScreen dibangun');
+    print('📍 DashboardPage dibangun'); // Perbaiki log ini
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard Keamanan'),
@@ -96,6 +146,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   Text('Status MQTT: $mqttStatus'),
                   const SizedBox(height: 10),
                   Text('Notifikasi: $lastNotif', style: const TextStyle(fontSize: 16)),
+                  const Divider(),
+                  // Bagian untuk menampilkan Suhu dan Kelembaban
+                  Text('Suhu: ${temperature?.toStringAsFixed(1) ?? '-'} °C', style: const TextStyle(fontSize: 16)),
+                  Text('Kelembaban: ${humidity?.toStringAsFixed(1) ?? '-'} %', style: const TextStyle(fontSize: 16)),
                   const Divider(),
                   const Text('Kontrol Perangkat:', style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
