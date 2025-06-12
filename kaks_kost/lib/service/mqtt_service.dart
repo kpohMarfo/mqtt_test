@@ -12,7 +12,7 @@ class MQTTService {
   final String broker = 'f1e0e15e.ala.asia-southeast1.emqxsl.com';
   final int port = 8883;
   final String username = 'rafo'; // Kredensial untuk aplikasi Flutter
-  final String password = 'rafo12345678'; // Kredensial untuk aplikasi Flutter
+  final String password = 'rafo12345'; // Kredensial untuk aplikasi Flutter
 
   final String clientIdentifier = 'flutter_kost_app_${Uuid().v4()}';
 
@@ -42,11 +42,12 @@ class MQTTService {
     _client!.onSubscribed = onSubscribed;
 
     final connMess = MqttConnectMessage()
-        .withClientIdentifier(clientIdentifier)
-        .startClean()
-        .keepAliveFor(20)
-        .authenticateAs(username, password)
-        .withWillQos(MqttQos.atLeastOnce);
+    .withClientIdentifier(clientIdentifier)
+    .withProtocolName('MQTT')  // Ganti dari default MQIsdp
+    .withProtocolVersion(4)    // v3.1.1 = version 4
+    .startClean()
+    .keepAliveFor(20)
+    .authenticateAs(username, password);
 
     _client!.connectionMessage = connMess;
 
